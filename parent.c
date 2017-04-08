@@ -1,56 +1,78 @@
 #include "includes.h"
 
-void initialFork();
-//void spawn(int[]);
-//void iterate();
-//void cleanUp(int);
+void initialFork(int);
 void masterHandler(int signum);
-//void dispatch(int);
-//void setTimer(int*);
+void requestMgmt(mymsg_t message);
+//void cleanUp(int);
 
-
-int x = 4;
+int x = 2;
 
 struct sigaction act;
 int queueid;
-sysClock* clockid;
+system_t* sysid;
 memCtrl* rscid;
 
 FILE* fptr;
 char* fileName = "a.out";
 int lineCount = 0;
 
-pid_t children[MAXP + 1];
-
-
 int main(int argc, char **argv){
-	int i;
+	mymsg_t message;
+	int i, msgSize = sizeof(message.mtext);
 	//fptr = fopen(fileName, "w");
 
     act.sa_handler = masterHandler;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
-	sigaction(SIGALRM, &act, NULL);	
-	sigaction(SIGINT, &act, NULL);	
+	sigaction(SIGALRM, &act, 0);
+	sigaction(SIGINT, &act, 0);
+	sigaction(SIGTERM, &act, 0);
+	alarm(10);
 
 	queueid = initqueue();
-	clockid = getClock();
+	sysid = getSystem();
 	rscid = getCtrl();
 	
-	for (i = 1; i <= x; i++){if(children[i] == 1) continue; initialFork(i);}
-	
-	initClock(clockid);
+	initClock(sysid);
+	initRsc(rscid);
 
-
-	while (!updateClock(100, clockid)){
-		printf("%d \n", clockid->clock[1]);
-		sleep(1);
+	for (i = 0; i < x; i++){
+		if (sysid->children[i] == 0){
+			initialFork(i);
+			//printf("%d: %d\n", i, sysid->children[i]);
+		}
 	}
-	printf("%d \n", clockid->clock[1]);
 
-	
+	while (!timeIsUp(sysid)){
+		updateClock(10000000, sysid);
+		msgrcv(queueid, &message, msgSize, 1, IPC_NOWAIT);
+		fflush(stdout);
+		//fprintf(stderr,"%c\n", message.mtext[0]);
+		//printf("we got one %c\n", message.mtext[0]);
+		if (message.mtext[0] == 'r'){
+			printf("%c i got it!\n", message.mtext[0]);
+		}
+		message.mtext[0] = 'O';
+		//requestMgmt(message);
+		//message.mtext[0] = '\0';
+		//printf("nothing\n");
+		msgsnd(queueid, &message, msgSize, 0);
+	}
+	//printf("%d\n", (int)sizeof(unsigned long));
 
+
+	sleep(2);
+	printf("final clock %li:%09li \n", sysid->clock[0], sysid->clock[1]);
 	masterHandler(0);
+}
+
+void requestMgmt(mymsg_t message){
+	if (message.mtext[0] == 'r'){
+		printf("%c\n", message.mtext[0]);
+	}
+	//printf("found\n");
+	//message.mtext[0] = 'k';
+	//msgsnd(queueid, &message, msgSize, 0);
 }
 
 void initialFork(int i){
@@ -59,7 +81,7 @@ void initialFork(int i){
 	switch (childPid = fork()){
         	case -1: perror("problem with fork()ing"); break;
         	case 0: execl("userProcess", "./userProcess", NULL); break;
-        	default: printf("parent pid: %d\n", getpid());
+        	default: sysid->children[i] = childPid;
 	}
 }
 
@@ -130,13 +152,18 @@ void initialFork(int i){
 void masterHandler(int sig){
 	int i;
 	
-//	for (i = 1; i <= MAXP; i++){
-//	kill(pcb[i].pid, SIGINT);
-//	}
+	for (i = 0; i < MAXP; i++){
+		if (sysid->children[i]){
+			kill(sysid->children[i], SIGINT);
+			waitpid(sysid->children[i],0,0);
+		}
+		//else printf("no child %d\n", i);
+	}
 	errorCheck(msgctl(queueid, IPC_RMID,0 ), "closing message queue");
 	releaseCtrl(&rscid, 'd');
-	releaseClock(&clockid, 'd');
+	releaseClock(&sysid, 'd');
 //	fclose(fptr);
-	printf("program is complete\n");
+	if (sig != 0) fprintf(stderr, "program is complete\n");
+	else printf("no errors detected\n");
 	exit(1);
 }

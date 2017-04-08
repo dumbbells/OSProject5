@@ -1,9 +1,12 @@
 #include "includes.h"
 //int findid();
-mymsg_t message;
+
+void childHandler(int sig);
+
+
 struct sigaction act;
 int queueid;
-sysClock* clockid;
+system_t* sysid;
 memCtrl* rscid;
 
 int main(int argc, char **argv){
@@ -14,10 +17,7 @@ int main(int argc, char **argv){
 	pcb = pcbMem(MAXP);
 	int id = findid();
 	
-	act.sa_handler = childHandler;
-	act.sa_flags = 0;
-	sigemptyset(&act.sa_mask);
-	sigaction(SIGINT, &act, NULL);
+
 
 	bool inter, cont = true;	
 	
@@ -49,22 +49,49 @@ int main(int argc, char **argv){
 	}
 	releasepcb(&pcb, "none");
 */
+	mymsg_t message;
+	int msgSize = sizeof(message.mtext);
+
+	act.sa_handler = childHandler;
+	act.sa_flags = 0;
+	sigemptyset(&act.sa_mask);
+	sigaction(SIGALRM, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
+	alarm(10);
+
 	queueid = initqueue();
-	clockid = getClock();
+	sysid = getSystem();
 	rscid = getCtrl();
 
-	while(!updateClock(10, clockid)){
-		//printf("i'm trying %d\n", getpid());
-		//sleep(1);
+	message.mtype = 1;
+	message.mtext[0] = 'r';
+	message.mtext[1] = '\0';
+	//printf("%c\n", message.mtext[0]);
+	//msgsnd(queueid, &message, msgSize, 0);
+
+	//printf("I sent it!\n");
+
+	while(!timeIsUp(sysid)){
+		updateClock(10000001, sysid);
+		//printf("%c\n", message.mtext[0]);
+		if (!(sysid->clock[0] % 5000000)){
+			message.mtext[0] = 'r';
+			msgsnd(queueid, &message, msgSize, IPC_NOWAIT);
+			msgrcv(queueid, &message, msgSize, 1, 0);
+		}
 	}
 
 
-	printf("child pid: %d\n", getpid());
-	return 0;
+
+	//printf("child pid: %d\n", getpid());
+	exit(1);
+	//return 0;
 }
 
 void childHandler(int sig){
-	releaseClock(&clockid, ' ');
+	fprintf(stderr, "goodbye from child %d\n", getpid());
+	releaseClock(&sysid, ' ');
 	releaseCtrl(&rscid, ' ');
 	exit(1);
 }

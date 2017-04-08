@@ -1,8 +1,9 @@
 #ifndef INCLUDE_H_
 #define INCLUDE_H_
 #define MAXP 18
+#define TOTALRSC 20
 
-int shmRsc;
+//int shmRsc;
 
 #include <stdarg.h>
 #include <unistd.h>
@@ -31,7 +32,7 @@ typedef struct{
 	int available[20];
 } memCtrl;
 
-
+void initRsc(memCtrl*);
 memCtrl* getCtrl();
 void releaseCtrl(memCtrl** ptr, char name);
 #endif

@@ -6,6 +6,9 @@
  */
 
 #include "system.h"
+	mymsg_t message;
+	int msgSize, msgKey;
+	bool isParent = false;
 
 void errorCheck (int i, char* string){
         if (i < 0){
@@ -15,42 +18,62 @@ void errorCheck (int i, char* string){
 }
 
 int initqueue(){
-        int key;
-        errorCheck(key = ftok("RCS", 'R'), "ftok");
-        errorCheck(key=msgget(key, 0666 | IPC_CREAT), "msgget");
-        return key;
+        errorCheck(msgKey = ftok("Makefile", 'R'), "ftok");
+        errorCheck(msgKey=msgget(msgKey, 0666 | IPC_CREAT), "msgget");
+        return msgKey;
 }
 
 int shmid;
-sysClock* getClock(){
-		sysClock *loc;
+system_t* getSystem(){
+		system_t *loc;
         key_t key;
-        errorCheck(key = ftok("RCS", 'R'), "key");
-        errorCheck(shmid = shmget(key, (sizeof(sysClock)),
+        errorCheck(key = ftok("Makefile", 'R'), "key");
+        errorCheck(shmid = shmget(key, (sizeof(system)),
         		0606 | IPC_CREAT), "shmget sysClock");
         loc = shmat(shmid, (void*)0,0);
         return loc;
 }
-void releaseClock(sysClock** ptr, char name){
+void releaseClock(system_t** ptr, char name){
         if(name == 'd')shmctl(shmid, IPC_RMID, NULL);
         else errorCheck(shmdt(*ptr), "shmdt");
         return;
 }
 
-void initClock(sysClock* clock){
+void initClock(system_t* clock){
+	msgSize = sizeof(message.mtext);
+	message.mtype = 2;
+	message.mtext[0] = 'k';
+	errorCheck(msgsnd(msgKey, &message, msgSize, 0), "init clock msg");
 	clock->clock[0] = 0;
 	clock->clock[1] = 0;
 }
 
-bool updateClock(int increment, sysClock* clock){
+bool updateClock(int increment, system_t* clock){
+	if (clock->clock[0] >= 1) return false;
+
+	msgSize = sizeof(message.mtext);
+	msgrcv(msgKey, &message, msgSize, 2, 0);
+/*	if (message.mtext[0] != 'k'){
+		msgsnd(msgKey, &message, msgSize, 0);
+		return true;
+	}
+*/
+
 	clock->clock[1] += increment;
-	//rollOver(clock);
-	if (clock->clock[0] == 1) return true;
+	rollOver(clock);
+	//printf("%d: incrementing to %02li:%09li\n", getpid(),
+		//	clock->clock[0], clock->clock[1]);
+	errorCheck(msgsnd(msgKey, &message, msgSize, 0), "clock message");
 	return true;
 }
 
-bool rollOver(sysClock* clock){
+bool timeIsUp(system_t* clock){
+	return clock->clock[0] > 1;
+}
+
+bool rollOver(system_t* clock){
 	if (clock->clock[1] >=(int)pow(10,9)){
+		//printf("one second\n");
 		clock->clock[0]++;
 		clock->clock[1]-=(int)pow(10,9);
 	}
