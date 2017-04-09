@@ -8,7 +8,7 @@
 #ifndef SYSTEM_H_
 #define SYSTEM_H_
 #define MAXP 18
-
+#define MSGSIZE 9
 
 #include <unistd.h>
 #include <stdio.h>
@@ -27,7 +27,7 @@ typedef struct{
 
 typedef struct{
 	long mtype;
-	char mtext[2];
+	char mtext[MSGSIZE];
 } mymsg_t;
 
 bool timeIsUp(system_t* clock);

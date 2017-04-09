@@ -31,7 +31,7 @@ void initRsc(memCtrl* control){
 		control->totalR[i] = rand()%10 + 1;
 		control->available[i] = control->totalR[i];
 
-	//printf("created %d of rsc %d\n", control->totalR[i], i);
+	printf("created %d of rsc %d\n", control->totalR[i], i);
 	}
 }
 

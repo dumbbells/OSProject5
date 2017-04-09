@@ -7,7 +7,7 @@
 
 #include "system.h"
 	mymsg_t message;
-	int msgSize, msgKey;
+	int msgKey;
 	bool isParent = false;
 
 void errorCheck (int i, char* string){
@@ -40,10 +40,9 @@ void releaseClock(system_t** ptr, char name){
 }
 
 void initClock(system_t* clock){
-	msgSize = sizeof(message.mtext);
 	message.mtype = 2;
 	message.mtext[0] = 'k';
-	errorCheck(msgsnd(msgKey, &message, msgSize, 0), "init clock msg");
+	errorCheck(msgsnd(msgKey, &message, MSGSIZE, 0), "init clock msg");
 	clock->clock[0] = 0;
 	clock->clock[1] = 0;
 }
@@ -51,24 +50,17 @@ void initClock(system_t* clock){
 bool updateClock(int increment, system_t* clock){
 	if (clock->clock[0] >= 1) return false;
 
-	msgSize = sizeof(message.mtext);
-	msgrcv(msgKey, &message, msgSize, 2, 0);
-/*	if (message.mtext[0] != 'k'){
-		msgsnd(msgKey, &message, msgSize, 0);
-		return true;
-	}
-*/
+	msgrcv(msgKey, &message, MSGSIZE, 2, 0);
 
 	clock->clock[1] += increment;
 	rollOver(clock);
-	//printf("%d: incrementing to %02li:%09li\n", getpid(),
-		//	clock->clock[0], clock->clock[1]);
-	errorCheck(msgsnd(msgKey, &message, msgSize, 0), "clock message");
+	//printf("%d: incrementing to %02li:%09li\n", getpid(), clock->clock[0], clock->clock[1]);
+	errorCheck(msgsnd(msgKey, &message, MSGSIZE, 0), "clock message");
 	return true;
 }
 
 bool timeIsUp(system_t* clock){
-	return clock->clock[0] > 1;
+	return clock->clock[0] > 2;
 }
 
 bool rollOver(system_t* clock){

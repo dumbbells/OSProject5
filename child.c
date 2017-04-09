@@ -50,7 +50,6 @@ int main(int argc, char **argv){
 	releasepcb(&pcb, "none");
 */
 	mymsg_t message;
-	int msgSize = sizeof(message.mtext);
 
 	act.sa_handler = childHandler;
 	act.sa_flags = 0;
@@ -64,29 +63,19 @@ int main(int argc, char **argv){
 	sysid = getSystem();
 	rscid = getCtrl();
 
-	message.mtype = 1;
-	message.mtext[0] = 'r';
-	message.mtext[1] = '\0';
-	//printf("%c\n", message.mtext[0]);
-	//msgsnd(queueid, &message, msgSize, 0);
 
-	//printf("I sent it!\n");
-
-	while(!timeIsUp(sysid)){
-		updateClock(10000001, sysid);
-		//printf("%c\n", message.mtext[0]);
-		if (!(sysid->clock[0] % 5000000)){
-			message.mtext[0] = 'r';
-			msgsnd(queueid, &message, msgSize, IPC_NOWAIT);
-			msgrcv(queueid, &message, msgSize, 1, 0);
+	while(updateClock(1000000, sysid)){
+		if (!(sysid->clock[0] % 100000)){
+			message.mtype = 1;
+			sprintf(message.mtext, "02 %d", getpid());
+			msgsnd(queueid, &message, MSGSIZE, 0);
+			msgrcv(queueid, &message, MSGSIZE, getpid(), 0);
+			printf("%d: %s\n",getpid(), message.mtext);
 		}
 	}
 
-
-
-	//printf("child pid: %d\n", getpid());
+	printf("child pid: %d\n", getpid());
 	exit(1);
-	//return 0;
 }
 
 void childHandler(int sig){
