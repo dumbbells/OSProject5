@@ -3,6 +3,7 @@
 void childHandler(int sig);
 void initChild();
 bool reqRsc();
+void setReqTimer(int);
 
 struct sigaction act;
 int queueid;
@@ -49,16 +50,23 @@ int main(int argc, char **argv){
 }
 
 bool reqRsc(){
-	if (sysid->clock[0] < childData.clock[0] || (
+	if (sysid->clock[0] > childData.clock[0] || (
 			sysid->clock[0] == childData.clock[0] &&
-			sysid->clock[1] <= childData.clock[1]))
+			sysid->clock[1] >= childData.clock[1])){
+		printf("ask for a resource\n");
 		return true;
+	}
 	return false;
 }
 
 void initChild(int quantum){
+	setReqTimer(quantum);
+}
+
+void setReqTimer(int quantum){
 	childData.clock[1] = sysid->clock[1] + (rand()%quantum)/10;
 	rollOver(&childData);
+	printf("wait until %li:%li\n", childData.clock[0], childData.clock[1]);
 }
 
 void childHandler(int sig){
