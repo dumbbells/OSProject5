@@ -22,7 +22,7 @@
 typedef struct{
 	unsigned long clock[2];
 	unsigned long timer[2];
-	pid_t children[MAXP + 1];
+	pid_t children[MAXP];
 } system_t;
 
 typedef struct{

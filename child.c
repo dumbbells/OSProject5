@@ -1,55 +1,19 @@
 #include "includes.h"
-//int findid();
 
 void childHandler(int sig);
-
+void initChild();
+bool reqRsc();
 
 struct sigaction act;
 int queueid;
+system_t childData;
 system_t* sysid;
 memCtrl* rscid;
 
 int main(int argc, char **argv){
-/*	srand(getpid());
-	int msgSize = sizeof(message.mtext);
-	int time;
-	int queueid = initqueue();
-	pcb = pcbMem(MAXP);
-	int id = findid();
-	
-
-
-	bool inter, cont = true;	
-	
-	while (cont){	
-		inter = false;
-		int temp;
-		msgrcv(queueid, &message, msgSize, id, 0);
-		message.mtext[10] = '\0';
-		message.mtype = id + 20;
-		
-		time = atoi(message.mtext);
-		
-		if (!(rand()%3)){
-			time = rand() % time;
-			inter = true;
-		}
-		temp = pcb[id].timeUsed;
-		pcb[id].timeUsed += time;
-		if (pcb[id].timeUsed >= pcb[id].totalTime){
-			time = pcb[id].totalTime - temp;
-			sprintf(message.mtext, "%010d%c", time, 'd');
-			cont = false;
-		}
-		else if (inter)
-			 sprintf(message.mtext, "%010d%c", time, 'i');
-		else sprintf(message.mtext, "%010d%c", time, 'a');
-	
-		msgsnd(queueid, &message, msgSize, 0);
-	}
-	releasepcb(&pcb, "none");
-*/
+	int quantum = 1000000;
 	mymsg_t message;
+	srand(getpid());
 
 	act.sa_handler = childHandler;
 	act.sa_flags = 0;
@@ -63,11 +27,17 @@ int main(int argc, char **argv){
 	sysid = getSystem();
 	rscid = getCtrl();
 
+	initChild(quantum);
 
-	while(updateClock(1000000, sysid)){
-		if (!(sysid->clock[0] % 100000)){
+	int rsc = rand()%20;
+
+
+	while(updateClock(quantum, sysid)){
+		if (reqRsc()){
 			message.mtype = 1;
-			sprintf(message.mtext, "02 %d", getpid());
+			printf("%d: requesting rsc %d at %li:%09li\n ", getpid(),
+					rsc, sysid->clock[0], sysid->clock[1]);
+			sprintf(message.mtext, "%02d %d", rsc, getpid());
 			msgsnd(queueid, &message, MSGSIZE, 0);
 			msgrcv(queueid, &message, MSGSIZE, getpid(), 0);
 			printf("%d: %s\n",getpid(), message.mtext);
@@ -76,6 +46,19 @@ int main(int argc, char **argv){
 
 	printf("child pid: %d\n", getpid());
 	exit(1);
+}
+
+bool reqRsc(){
+	if (sysid->clock[0] < childData.clock[0] || (
+			sysid->clock[0] == childData.clock[0] &&
+			sysid->clock[1] <= childData.clock[1]))
+		return true;
+	return false;
+}
+
+void initChild(int quantum){
+	childData.clock[1] = sysid->clock[1] + (rand()%quantum)/10;
+	rollOver(&childData);
 }
 
 void childHandler(int sig){

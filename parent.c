@@ -2,10 +2,10 @@
 
 void initialFork(int);
 void masterHandler(int signum);
-int requestMgmt(mymsg_t* message);
+bool requestMgmt(mymsg_t* message);
 //void cleanUp(int);
 
-int x = 1;
+int x = 2;
 
 struct sigaction act;
 int queueid;
@@ -44,18 +44,17 @@ int main(int argc, char **argv){
 
 	while (updateClock(1000, sysid)){
 		msgrcv(queueid, &message,MSGSIZE, 1, IPC_NOWAIT);
-		if (message.mtype == 1){
-			requestMgmt(&message);
-			//message.mtype = 3;
-			message.mtype = requestMgmt(&message);
-			msgsnd(queueid, &message, MSGSIZE, 0);
-		}
+		if (message.mtype == 1)
+			if(requestMgmt(&message))
+				msgsnd(queueid, &message, MSGSIZE, 0);
 	}
+
+	printWaitList(rscid, sysid->children);
 
 	masterHandler(0);
 }
 
-int requestMgmt(mymsg_t* message){
+bool requestMgmt(mymsg_t* message){
 	int rsc, childId, count = 0;
 	char temp[6];
 	pid_t pid;
@@ -77,9 +76,11 @@ int requestMgmt(mymsg_t* message){
 			break;
 		}
 	}
-	//printf("parent: %d %d %d\n", childId, rsc, pid);
-	if (requestRsc(rscid, childId, rsc)) printf("we got it!\n");
-	return pid;
+	if (requestRsc(rscid, childId, rsc)){
+		message->mtype = pid;
+		return true;
+	}
+	return false;
 }
 
 void initialFork(int i){

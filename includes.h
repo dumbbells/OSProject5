@@ -27,11 +27,13 @@ void errorCheck (int i, char* string);
 
 
 typedef struct{
-	int totalR[20];
-	int requested[18][20];
-	int available[20];
+	int totalR[TOTALRSC];
+	int requested[MAXP][TOTALRSC];
+	int available[TOTALRSC];
+	int waitList[MAXP];
 } memCtrl;
 
+void printWaitList(memCtrl* control, int* children);
 bool requestRsc(memCtrl* control, int process, int rscNum);
 void initRsc(memCtrl*);
 memCtrl* getCtrl();

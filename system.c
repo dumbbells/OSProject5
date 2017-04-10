@@ -8,7 +8,6 @@
 #include "system.h"
 	mymsg_t message;
 	int msgKey;
-	bool isParent = false;
 
 void errorCheck (int i, char* string){
         if (i < 0){
@@ -48,7 +47,7 @@ void initClock(system_t* clock){
 }
 
 bool updateClock(int increment, system_t* clock){
-	if (clock->clock[0] >= 1) return false;
+	if (clock->clock[0] > 1) return false;
 
 	msgrcv(msgKey, &message, MSGSIZE, 2, 0);
 
@@ -59,15 +58,14 @@ bool updateClock(int increment, system_t* clock){
 	return true;
 }
 
-bool timeIsUp(system_t* clock){
-	return clock->clock[0] > 2;
-}
-
 bool rollOver(system_t* clock){
 	if (clock->clock[1] >=(int)pow(10,9)){
-		//printf("one second\n");
 		clock->clock[0]++;
 		clock->clock[1]-=(int)pow(10,9);
+	}
+	if (clock->timer[0] >=(int)pow(10,9)){
+		clock->timer[0]++;
+		clock->timer[1]-=(int)pow(10,9);
 	}
 	return true;
 }
