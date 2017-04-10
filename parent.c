@@ -5,7 +5,7 @@ void masterHandler(int signum);
 bool requestMgmt(mymsg_t* message);
 //void cleanUp(int);
 
-int x = 2;
+int x = 1;
 
 struct sigaction act;
 int queueid;

@@ -4,6 +4,7 @@ void childHandler(int sig);
 void initChild();
 bool reqRsc();
 void setReqTimer(int);
+void timeUp();
 
 struct sigaction act;
 int queueid;
@@ -41,8 +42,10 @@ int main(int argc, char **argv){
 			sprintf(message.mtext, "%02d %d", rsc, getpid());
 			msgsnd(queueid, &message, MSGSIZE, 0);
 			msgrcv(queueid, &message, MSGSIZE, getpid(), 0);
+			setReqTimer(quantum);
 			printf("%d: %s\n",getpid(), message.mtext);
 		}
+		else printf("skip\n");
 	}
 
 	printf("child pid: %d\n", getpid());
@@ -50,6 +53,7 @@ int main(int argc, char **argv){
 }
 
 bool reqRsc(){
+	timeUp();
 	if (sysid->clock[0] > childData.clock[0] || (
 			sysid->clock[0] == childData.clock[0] &&
 			sysid->clock[1] >= childData.clock[1])){
@@ -59,14 +63,27 @@ bool reqRsc(){
 	return false;
 }
 
+void timeUp(){
+	if (sysid->clock[0] > childData.timer[0] || (
+			sysid->clock[0] == childData.timer[0] &&
+			sysid->clock[1] >= childData.timer[1])){
+		printf("on my own accord\n");
+		childHandler(0);
+	}
+}
+
 void initChild(int quantum){
-	setReqTimer(quantum);
+	childData.clock[1] = sysid->clock[1] + (rand()%quantum)*10;
+	childData.timer[1] = sysid->clock[1] + (rand()%quantum)*1000;
+	rollOver(&childData);
+	printf("My expiration time is: %li:%09li\n", childData.timer[0], childData.timer[1]);
+	printf("wait until %li:%09li\n", childData.clock[0], childData.clock[1]);
 }
 
 void setReqTimer(int quantum){
-	childData.clock[1] = sysid->clock[1] + (rand()%quantum)/10;
+	childData.clock[1] = sysid->clock[1] + (rand()%quantum)*10;
 	rollOver(&childData);
-	printf("wait until %li:%li\n", childData.clock[0], childData.clock[1]);
+	printf("wait until %li:%09li\n", childData.clock[0], childData.clock[1]);
 }
 
 void childHandler(int sig){
