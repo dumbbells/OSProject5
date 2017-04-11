@@ -39,7 +39,7 @@ void releaseClock(system_t** ptr, char name){
 }
 
 void initClock(system_t* clock){
-	message.mtype = 2;
+	message.mtype = 4;
 	message.mtext[0] = 'k';
 	errorCheck(msgsnd(msgKey, &message, MSGSIZE, 0), "init clock msg");
 	clock->clock[0] = 0;
@@ -49,7 +49,7 @@ void initClock(system_t* clock){
 bool updateClock(int increment, system_t* clock){
 	if (clock->clock[0] > 1) return false;
 
-	msgrcv(msgKey, &message, MSGSIZE, 2, 0);
+	msgrcv(msgKey, &message, MSGSIZE, 4, 0);
 
 	clock->clock[1] += increment;
 	rollOver(clock);

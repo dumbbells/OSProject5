@@ -5,7 +5,7 @@ void masterHandler(int signum);
 bool requestMgmt(mymsg_t*);
 //void cleanUp(int);
 
-int x = 1;
+int x = 2;
 
 struct sigaction act;
 int queueid;
@@ -42,17 +42,16 @@ int main(int argc, char **argv){
 		}
 	}
 
-	while (updateClock(1000, sysid)){
-		if (msgrcv(queueid, &message, MSGSIZE, 1, IPC_NOWAIT) == MSGSIZE){
+	while (updateClock(100000, sysid)){
+		if (msgrcv(queueid, &message, MSGSIZE, -3, IPC_NOWAIT) == MSGSIZE){
 			if(requestMgmt(&message)){
 				msgsnd(queueid, &message, MSGSIZE, 0);
 			}
-			else printWaitList(rscid, sysid->children);
 		}
-		if (msgrcv(queueid, &message, MSGSIZE, 3, IPC_NOWAIT) == MSGSIZE){
+	//	if (msgrcv(queueid, &message, MSGSIZE, 3, IPC_NOWAIT) == MSGSIZE){
 			//requestMgmt(&message);
-			printf("\t!!release noted!!\n");
-		}
+	//		printf("\t!!release noted!!\n");
+	//	}
 	}
 
 	masterHandler(0);
@@ -62,7 +61,7 @@ bool requestMgmt(mymsg_t* message){
 	int rsc, childId, count = 0;
 	char temp[6];
 	pid_t pid;
-	while (message->mtext[count] != ' '){
+	while (count < 2){
 		temp[count] = message->mtext[count];
 		count++;
 		temp[count] = '\0';
@@ -80,11 +79,20 @@ bool requestMgmt(mymsg_t* message){
 			break;
 		}
 	}
-	if (requestRsc(rscid, childId, rsc)){
-		message->mtype = pid;
-		return true;
+	if (message->mtype == 1){
+		if (requestRsc(rscid, childId, rsc)){
+			message->mtype = pid;
+			return true;
+		}
+		else printWaitList(rscid, sysid->children);
 	}
-	message->mtype = 2;
+	else if(message->mtype == 2){
+		printf("\t!!release noted!!\n");
+		releaseRsc(rscid, childId, rsc);
+	}
+	else if (message->mtype == 3){
+		printf("\t !!termination noted!!\n");
+	}
 	return false;
 }
 
@@ -97,56 +105,6 @@ void initialFork(int i){
         	default: sysid->children[i] = childPid;
 	}
 }
-
-
-
-//This will be a model for some of the message handling
-/*void dispatch(int i){
-	char code;
-	mymsg_t message;
-	msgSize = sizeof(message.mtext);
-	message.mtype = i;
-	sprintf(message.mtext, "%010d%c\0", quantum * (pcb[i].priority + 1), 'a');
-	fprintf(fptr, "OSS: %d:%09d Scheduling process %02d from %d with quantum %010d\n",
-		systemClock[0], systemClock[1], i, pcb[i].priority, 
-		quantum * (pcb[i].priority + 1));
-	lineCount++;
-	errorCheck(msgsnd(queueid, &message,msgSize, 0), "msgsnd");
-	
-	msgrcv(queueid, &message, msgSize, i + 20, 0);
-	code = message.mtext[10];
-	message.mtext[10] = '\0';
-	systemClock[1] += atoi(message.mtext);
-	rollOver();
-	fprintf(fptr, "OSS: %d:%09d Receiving  process %02d with a run time of  %s\n",
-		systemClock[0], systemClock[1], i, message.mtext);
-	switch (code){
-		case 'd': cleanUp(i); count++; break;
-		case 'i': pcb[i].priority = -1;
-		case 'a': if (pcb[i].priority < 2) pcb[i].priority++;
-		insert(priors[pcb[i].priority], i);
-		fprintf(fptr, "OSS: %d:%09d Sorting    process %02d in queue %d\n", 
-			systemClock[0], systemClock[1], i, pcb[i].priority);	
-	}
-	lineCount+=2;
-
-}
-*/
-
-/*void iterate(){
-	int timer[2], temp;
-	setTimer(timer);
-	while (systemClock[0] < 2 && lineCount < 10000){
-		systemClock[1] += idleTime[1] += temp = rand()%overHead;
-		rollOver();
-		if (!isEmpty(priors[0])) dispatch(removeData(priors[0]));
-		else if (!isEmpty(priors[1])) dispatch(removeData(priors[1]));
-		else if (!isEmpty(priors[2])) dispatch(removeData(priors[2]));
-		else systemClock[1] += temp;
-		spawn(timer);
-	}	
-}
-*/
 
 /*void cleanUp(int i){
 	if (status[i]){
@@ -176,7 +134,7 @@ void masterHandler(int sig){
 	releaseClock(&sysid, 'd');
 //	fclose(fptr);
 	printf("final clock %li:%09li \n", sysid->clock[0], sysid->clock[1]);
-	if (sig != 0) fprintf(stderr, "program is complete\n");
+	if (sig != 0) fprintf(stderr, "program was termed\n");
 	else printf("no errors detected\n");
 	exit(1);
 }

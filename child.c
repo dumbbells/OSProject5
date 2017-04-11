@@ -11,14 +11,14 @@ int queueid, quantum = 1000000;
 system_t childData;
 system_t* sysid;
 memCtrl* rscid;
+mymsg_t message;
 
 int main(int argc, char **argv){
-	int i, rscHeld[TOTALRSC];
+	int i, rsc, rscHeld[TOTALRSC];
 
 	for (i = 0; i < TOTALRSC; i++){
 		rscHeld[i] = 0;
 	}
-	mymsg_t message;
 	srand(getpid());
 
 	act.sa_handler = childHandler;
@@ -27,7 +27,7 @@ int main(int argc, char **argv){
 	sigaction(SIGALRM, &act, NULL);
 	sigaction(SIGINT, &act, NULL);
 	sigaction(SIGTERM, &act, NULL);
-	alarm(10);
+	alarm(12);
 
 	queueid = initqueue();
 	sysid = getSystem();
@@ -36,38 +36,28 @@ int main(int argc, char **argv){
 	initChild(quantum);
 	setReqTimer(quantum);
 
-	int rsc = rand()%TOTALRSC;
-
+	rsc = rand()%TOTALRSC;
 
 	while(updateClock(quantum, sysid)){
+		timeUp();
 		if (reqRsc()){
+			sprintf(message.mtext, "%02d %d", rsc, getpid());
 			if (rand()%3 != 0){
 				message.mtype = 1;
-				printf("%d: requesting rsc %d at %li:%09li\n ", getpid(),
+				printf("%d: requesting rsc %d at %li:%09li\n", getpid(),
 						rsc, sysid->clock[0], sysid->clock[1]);
-				sprintf(message.mtext, "%02d %d", rsc, getpid());
 				msgsnd(queueid, &message, MSGSIZE, 0);
 				msgrcv(queueid, &message, MSGSIZE, getpid(), 0);
 				rscHeld[rsc]++;
 			}
 			else {
-				printf("release\n");
-				message.mtype = 3;
-				for (i = 0; i < TOTALRSC; i++){
-					if (rscHeld[i] != 0){
-						while (true){
-							rsc = rand()%TOTALRSC;
-							if(rscHeld[rsc] != 0){
-								i = 20;
-								break;
-							}
-						}
-					}
+				message.mtype = 2;
+				if (rscHeld[rsc] > 0){
+					rscHeld[rsc]--;
+					printf("%d: releasing rsc %d at %li:%09li\n", getpid(),
+							rsc, sysid->clock[0], sysid->clock[1]);
+					msgsnd(queueid, &message, MSGSIZE, 0);
 				}
-				printf("%d: releasing rsc %d at %li:%09li\n ", getpid(),
-						rsc, sysid->clock[0], sysid->clock[1]);
-				sprintf(message.mtext, "%02d %d", rsc, getpid());
-				msgsnd(queueid, &message, MSGSIZE, 0);
 			}
 			setReqTimer(quantum);
 			//printf("%d: %s\n",getpid(), message.mtext);
@@ -80,11 +70,9 @@ int main(int argc, char **argv){
 }
 
 bool reqRsc(){
-	timeUp();
 	if (sysid->clock[0] > childData.clock[0] || (
 			sysid->clock[0] == childData.clock[0] &&
 			sysid->clock[1] >= childData.clock[1])){
-		printf("ask for attention\n");
 		return true;
 	}
 	return false;
@@ -94,13 +82,16 @@ void timeUp(){
 	if (sysid->clock[0] > childData.timer[0] || (
 			sysid->clock[0] == childData.timer[0] &&
 			sysid->clock[1] >= childData.timer[1])){
-		if (rand()%4 == 0){
-			printf("on my own accord\n");
+		if (false){
+		//if (rand()%4 == 0){
+			sprintf(message.mtext, "00 %d", getpid());
+			message.mtype = 3;
+			msgsnd(queueid, &message, MSGSIZE, 0);
 			childHandler(0);
 		}
 		else{
 			initChild();
-			printf("back in the race! \n");
+			//printf("back in the race! \n");
 		}
 	}
 }
@@ -108,13 +99,13 @@ void timeUp(){
 void initChild(){
 	childData.timer[1] = sysid->clock[1] + (rand()%quantum)*100;
 	rollOver(&childData);
-	printf("My expiration time is: %li:%09li\n", childData.timer[0], childData.timer[1]);
+	//printf("My expiration time is: %li:%09li\n", childData.timer[0], childData.timer[1]);
 }
 
 void setReqTimer(){
 	childData.clock[1] = sysid->clock[1] + (rand()%quantum)*10;
 	rollOver(&childData);
-	printf("wait until %li:%09li\n", childData.clock[0], childData.clock[1]);
+	//printf("wait until %li:%09li\n", childData.clock[0], childData.clock[1]);
 }
 
 void childHandler(int sig){

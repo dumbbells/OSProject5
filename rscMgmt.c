@@ -1,8 +1,12 @@
 #include "includes.h"
 int shmid1;
 
+void printWaitList(memCtrl* control, int* children);
+bool requestRsc(memCtrl* control, int process, int rscNum);
+void initRsc(memCtrl*);
 memCtrl* getCtrl();
 void releaseCtrl(memCtrl** ptr, char name);
+void releaseRsc(memCtrl* control, int process, int rscNum);
 
 memCtrl* getCtrl(){
 		memCtrl *loc;
@@ -43,6 +47,12 @@ bool requestRsc(memCtrl* control, int process, int rscNum){
 	else
 		control->waitList[process] = rscNum;
 	return false;
+}
+
+void releaseRsc(memCtrl* control, int process, int rscNum){
+	if (control->totalR[rscNum] == 0) return;
+	control->requested[process][rscNum]--;
+	control->available[rscNum]++;
 }
 
 void printWaitList(memCtrl* control, int* children){

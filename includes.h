@@ -38,4 +38,5 @@ bool requestRsc(memCtrl* control, int process, int rscNum);
 void initRsc(memCtrl*);
 memCtrl* getCtrl();
 void releaseCtrl(memCtrl** ptr, char name);
+void releaseRsc(memCtrl* control, int process, int rscNum);
 #endif
