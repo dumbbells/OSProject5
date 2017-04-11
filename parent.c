@@ -2,7 +2,7 @@
 
 void initialFork(int);
 void masterHandler(int signum);
-bool requestMgmt(mymsg_t* message);
+bool requestMgmt(mymsg_t*);
 //void cleanUp(int);
 
 int x = 1;
@@ -43,13 +43,17 @@ int main(int argc, char **argv){
 	}
 
 	while (updateClock(1000, sysid)){
-		msgrcv(queueid, &message,MSGSIZE, 1, IPC_NOWAIT);
-		if (message.mtype == 1)
-			if(requestMgmt(&message))
+		if (msgrcv(queueid, &message, MSGSIZE, 1, IPC_NOWAIT) == MSGSIZE){
+			if(requestMgmt(&message)){
 				msgsnd(queueid, &message, MSGSIZE, 0);
+			}
+			else printWaitList(rscid, sysid->children);
+		}
+		if (msgrcv(queueid, &message, MSGSIZE, 3, IPC_NOWAIT) == MSGSIZE){
+			//requestMgmt(&message);
+			printf("\t!!release noted!!\n");
+		}
 	}
-
-	printWaitList(rscid, sysid->children);
 
 	masterHandler(0);
 }
@@ -80,6 +84,7 @@ bool requestMgmt(mymsg_t* message){
 		message->mtype = pid;
 		return true;
 	}
+	message->mtype = 2;
 	return false;
 }
 
