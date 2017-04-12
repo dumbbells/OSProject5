@@ -1,7 +1,7 @@
 #ifndef INCLUDE_H_
 #define INCLUDE_H_
 #define MAXP 18
-#define TOTALRSC 20
+#define TOTALRSC 3
 
 //int shmRsc;
 
@@ -33,10 +33,12 @@ typedef struct{
 	int waitList[MAXP];
 } memCtrl;
 
-void printWaitList(memCtrl* control, int* children);
-bool requestRsc(memCtrl* control, int process, int rscNum);
+int waitRelief(memCtrl* control, int rscNum);
+void printWaitList(memCtrl*, int*);
+bool requestRsc(memCtrl*, int, int);
 void initRsc(memCtrl*);
 memCtrl* getCtrl();
-void releaseCtrl(memCtrl** ptr, char name);
-void releaseRsc(memCtrl* control, int process, int rscNum);
+void releaseCtrl(memCtrl**, char);
+bool releaseRsc(memCtrl*, int, int);
+void releaseAll(memCtrl*, int);
 #endif

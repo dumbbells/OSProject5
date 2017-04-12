@@ -3,9 +3,9 @@
 void initialFork(int);
 void masterHandler(int signum);
 bool requestMgmt(mymsg_t*);
-//void cleanUp(int);
+void cleanUp(int);
 
-int x = 2;
+int x = 4;
 
 struct sigaction act;
 int queueid;
@@ -48,12 +48,9 @@ int main(int argc, char **argv){
 				msgsnd(queueid, &message, MSGSIZE, 0);
 			}
 		}
-	//	if (msgrcv(queueid, &message, MSGSIZE, 3, IPC_NOWAIT) == MSGSIZE){
-			//requestMgmt(&message);
-	//		printf("\t!!release noted!!\n");
-	//	}
 	}
 
+	printWaitList(rscid, sysid->children);
 	masterHandler(0);
 }
 
@@ -79,20 +76,44 @@ bool requestMgmt(mymsg_t* message){
 			break;
 		}
 	}
-	if (message->mtype == 1){
+	if (message->mtype == 3){
+		printf("%d: requesting rsc %d at %li:%09li\n", pid,
+				rsc, sysid->clock[0], sysid->clock[1]);
 		if (requestRsc(rscid, childId, rsc)){
 			message->mtype = pid;
+			//printf("!! %d: request granted!!\n", pid);
 			return true;
 		}
-		else printWaitList(rscid, sysid->children);
+		printf("\t\t%d: I am blocked!!!!\n", sysid->children[childId]);
 	}
 	else if(message->mtype == 2){
-		printf("\t!!release noted!!\n");
-		releaseRsc(rscid, childId, rsc);
+		if (releaseRsc(rscid, childId, rsc)){
+			printf("%d: releasing rsc %d at %li:%09li\n", pid,
+					rsc, sysid->clock[0], sysid->clock[1]);
+			while ((childId = waitRelief(rscid, rsc)) != -1){
+				printf("\t%d: sending %d to %d\n",
+						pid, rsc, sysid->children[childId]);
+				message->mtype = sysid->children[childId];
+				sprintf(message->mtext, "cont");
+				msgsnd(queueid, message, MSGSIZE, 0);
+			}
+			//printf("!! %d: release noted!!\n", pid);
+		}
 	}
-	else if (message->mtype == 3){
-		printf("\t !!termination noted!!\n");
+	else if (message->mtype == 1){
+		printf("\t !! %d: termination noted!!\n", pid);
+		cleanUp(childId);
+		releaseAll(rscid, childId);
+		for (count = 0; count < TOTALRSC; count++){
+			while ((childId = waitRelief(rscid, count)) != -1){
+							printf("\t%d: sending %d to %d\n",
+									pid, count, sysid->children[childId]);
+							message->mtype = sysid->children[childId];
+							msgsnd(queueid, message, MSGSIZE, 0);
+						}
+		}
 	}
+	message->mtype = 4;
 	return false;
 }
 
@@ -106,28 +127,20 @@ void initialFork(int i){
 	}
 }
 
-/*void cleanUp(int i){
-	if (status[i]){
-		siginfo_t info;
-		waitid(P_PID, pcb[i].pid, &info, WEXITED); 
-		status[i] = false;
-                fprintf(fptr, "OSS: %d:%09d terming    process %02d with total run time %010d\n",
-			systemClock[0], systemClock[1], i, maxTime);
-		waitTime += ((systemClock[0] * pow(10,9) + systemClock[1])
-			 - pcb[i].creationTime[0] *(10,9) - pcb[i].creationTime[1]
-			 - pcb[i].totalTime);
+void cleanUp(int i){
+	if (sysid->children[i] != 0){
+		kill(sysid->children[i], SIGINT);
+		waitpid(sysid->children[i],0,0);
+		//printf("\t\t we caught it!\n");
+		sysid->children[i] = 0;
 	}
-	return;
 }
-*/
+
 void masterHandler(int sig){
 	int i;
 	
 	for (i = 0; i < MAXP; i++){
-		if (sysid->children[i]){
-			kill(sysid->children[i], SIGINT);
-			waitpid(sysid->children[i],0,0);
-		}
+		cleanUp(i);
 	}
 	errorCheck(msgctl(queueid, IPC_RMID,0 ), "closing message queue");
 	releaseCtrl(&rscid, 'd');
