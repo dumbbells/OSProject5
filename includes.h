@@ -33,7 +33,7 @@ typedef struct{
 	int waitList[MAXP];
 } memCtrl;
 
-int waitRelief(memCtrl* control, int rscNum);
+int waitRelief(memCtrl* , int, int);
 void printWaitList(memCtrl*, int*);
 bool requestRsc(memCtrl*, int, int);
 void initRsc(memCtrl*);

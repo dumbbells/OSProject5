@@ -4,8 +4,10 @@ void initialFork(int);
 void masterHandler(int signum);
 bool requestMgmt(mymsg_t*);
 void cleanUp(int);
+void deadLockCheck();
+bool futureAvailable(int, int);
 
-int x = 4;
+int x = 2;
 
 struct sigaction act;
 int queueid;
@@ -32,7 +34,7 @@ int main(int argc, char **argv){
 	queueid = initqueue();
 	sysid = getSystem();
 	rscid = getCtrl();
-	
+
 	initClock(sysid);
 	initRsc(rscid);
 
@@ -49,13 +51,62 @@ int main(int argc, char **argv){
 			}
 		}
 	}
-
 	printWaitList(rscid, sysid->children);
 	masterHandler(0);
 }
 
+void deadLockResolve(int rsc){
+	int i, sysPid = 0;
+	mymsg_t message;
+	pid_t pidToKill = sysid->children[sysPid];
+	for (i = 0; i < MAXP; i++){
+		if (rscid->waitList[i] == rsc){
+			if (rscid->requested[i][rsc] > rscid->requested[sysPid][rsc]){
+				pidToKill = sysid->children[i];
+				sysPid = i;
+			}
+		}
+	}
+	printf("The process to terminate to resolve deadlock is %d\n", pidToKill);
+	cleanUp(sysPid);
+	releaseAll(rscid, sysPid);
+	int deadPid = sysPid;
+	for (i = 0; i < TOTALRSC; i++){
+		while ((sysPid = waitRelief(rscid, i, deadPid)) != -1){
+						printf("\t%d: sending %d to %d\n",
+								pidToKill, i, sysid->children[sysPid]);
+						message.mtype = sysid->children[sysPid];
+						sprintf(message.mtext, "%02d %d", i, sysid->children[sysPid]);
+						msgsnd(queueid, &message, MSGSIZE, 0);
+					}
+	}
+}
+
+bool futureAvailable(int rsc, int myPid){
+	int i;
+	for (i = 0; i < MAXP; i++){
+		if (i == myPid) continue;
+		if (rscid->requested[i][rsc] > 0){
+			if (rscid->waitList[i] == -1) return true;
+		}
+	}
+	return false;
+}
+
+void deadLockCheck(){
+	int i, rscWaitOn;
+	for (i = 0; i < MAXP; i++){
+		if (sysid->children[i] == 0) continue;
+		else if (rscid->waitList[i] > -1){
+			printf("%d is blocked\n", sysid->children[i]);
+			if (futureAvailable(rscid->waitList[i], i)) printf("might come around\n");
+			else deadLockResolve(rscid->waitList[i]);
+		}
+	}
+}
+
 bool requestMgmt(mymsg_t* message){
-	int rsc, childId, count = 0;
+	int rsc, childId, count = 0, sysPid;
 	char temp[6];
 	pid_t pid;
 	while (count < 2){
@@ -85,12 +136,14 @@ bool requestMgmt(mymsg_t* message){
 			return true;
 		}
 		printf("\t\t%d: I am blocked!!!!\n", sysid->children[childId]);
+		deadLockCheck();
 	}
 	else if(message->mtype == 2){
 		if (releaseRsc(rscid, childId, rsc)){
+			sysPid = childId;
 			printf("%d: releasing rsc %d at %li:%09li\n", pid,
 					rsc, sysid->clock[0], sysid->clock[1]);
-			while ((childId = waitRelief(rscid, rsc)) != -1){
+			while ((childId = waitRelief(rscid, rsc, sysPid)) != -1){
 				printf("\t%d: sending %d to %d\n",
 						pid, rsc, sysid->children[childId]);
 				message->mtype = sysid->children[childId];
@@ -104,8 +157,9 @@ bool requestMgmt(mymsg_t* message){
 		printf("\t !! %d: termination noted!!\n", pid);
 		cleanUp(childId);
 		releaseAll(rscid, childId);
+		sysPid = childId;
 		for (count = 0; count < TOTALRSC; count++){
-			while ((childId = waitRelief(rscid, count)) != -1){
+			while ((childId = waitRelief(rscid, count, sysPid)) != -1){
 							printf("\t%d: sending %d to %d\n",
 									pid, count, sysid->children[childId]);
 							message->mtype = sysid->children[childId];
@@ -138,7 +192,7 @@ void cleanUp(int i){
 
 void masterHandler(int sig){
 	int i;
-	
+
 	for (i = 0; i < MAXP; i++){
 		cleanUp(i);
 	}

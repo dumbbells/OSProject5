@@ -29,13 +29,15 @@ void releaseAll(memCtrl* control, int process){
 	for (i = 0; i < TOTALRSC; i++){
 		control->available[i] += control->requested[process][i];
 		control->requested[process][i] = 0;
+		control->waitList[process] = -1;
 	}
 }
 
-int waitRelief(memCtrl* control, int rscNum){
+int waitRelief(memCtrl* control, int rscNum, int myPid){
 	int i;
 	for (i = 0; i < MAXP; i++){
 		if (control->available[rscNum] == 0) break;
+		else if (i == myPid) continue;
 		else if (control->waitList[i] == -1) continue;
 		else if (control->waitList[i] == rscNum){
 			control->available[rscNum]--;
@@ -63,7 +65,7 @@ void initRsc(memCtrl* control){
 	srand(getpid());
 	int i;
 	for (i = 0; i < TOTALRSC; i++){
-		control->totalR[i] = rand()%5 + 1;
+		control->totalR[i] = rand()%2 + 1;
 		control->available[i] = control->totalR[i];
 		//if (rand()%5 == 0) control->totalR[i] = 0;
 		printf("created %d of rsc %d\n", control->totalR[i], i);
@@ -89,4 +91,3 @@ void releaseCtrl(memCtrl** ptr, char name){
         else errorCheck(shmdt(*ptr), "shmdt");
         return;
 }
-
