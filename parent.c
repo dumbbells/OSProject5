@@ -61,7 +61,7 @@ int main(int argc, char **argv){
 }
 
 int numOfDeadLocksResolved(int process){
-	int i, value = 0;
+	int i, value = 1;
 	for (i = 0; i < TOTALRSC; i++){
 		if (rscid->waitedOn[i] > 0){
 			if (rscid->waitedOn[i] >= rscid->requested[process][i])
@@ -79,6 +79,7 @@ void deadLockResolve(int rsc){
 	mymsg_t message;
 	pid_t pidToKill = sysid->children[sysPid];
 	for (i = 0; i < MAXP; i++){
+		if (rscid->waitList[i] != rsc) continue;
 		if (numResolved <= (temp = numOfDeadLocksResolved(i))){
 			sysPid = i;
 			numResolved = temp;
