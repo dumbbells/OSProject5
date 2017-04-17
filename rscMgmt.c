@@ -11,6 +11,7 @@ bool requestRsc(memCtrl* control, int process, int rscNum){
 	}
 	else
 		control->waitList[process] = rscNum;
+		control->waitedOn[rscNum]++;
 	return false;
 }
 
@@ -29,7 +30,10 @@ void releaseAll(memCtrl* control, int process){
 	for (i = 0; i < TOTALRSC; i++){
 		control->available[i] += control->requested[process][i];
 		control->requested[process][i] = 0;
-		control->waitList[process] = -1;
+		if (control->waitList[process] > -1){
+			control->waitedOn[control->waitList[process]]--;			
+			control->waitList[process] = -1;		
+		}
 	}
 }
 
@@ -40,6 +44,7 @@ int waitRelief(memCtrl* control, int rscNum, int myPid){
 		else if (i == myPid) continue;
 		else if (control->waitList[i] == -1) continue;
 		else if (control->waitList[i] == rscNum){
+			control->waitedOn[rscNum]--;
 			control->available[rscNum]--;
 			control->requested[i][rscNum]++;
 			control->waitList[i] = -1;
@@ -50,24 +55,34 @@ int waitRelief(memCtrl* control, int rscNum, int myPid){
 }
 
 void printWaitList(memCtrl* control, int* children){
-	int i;
+	int i, k;
 	for (i = 0; i < TOTALRSC; i++){
-		printf("%d remaining of rsc %d\n", control->available[i], i);
+		printf("%d remaining of rsc %d of %d\n", control->available[i], i, control->totalR[i]);
 	}
 	for (i = 0; i < MAXP; i++){
 		if (control->waitList[i] != -1 && children[i] != 0){
 			printf("%d is waiting on %d\n", children[i], control->waitList[i]);
 		}
 	}
+/*	for (i = 0; i < MAXP; i++){
+		if (children[i] != 0){
+			printf("%d attained:\n", children[i]);
+			for (k = 0; k < TOTALRSC; k++){
+				printf("RSC %d: %d\n", k, control->requested[i][k]);
+			}
+		}
+	}
+*/
 }
 
 void initRsc(memCtrl* control){
 	srand(getpid());
 	int i;
 	for (i = 0; i < TOTALRSC; i++){
-		control->totalR[i] = rand()%2 + 1;
+		control->waitedOn[i] = 0;
+		control->totalR[i] = rand()%10 + 1;
 		control->available[i] = control->totalR[i];
-		//if (rand()%5 == 0) control->totalR[i] = 0;
+		if (rand()%5 == 0) control->totalR[i] = 0;
 		printf("created %d of rsc %d\n", control->totalR[i], i);
 	}
 	for (i = 0; i < MAXP; i++){

@@ -1,7 +1,7 @@
 #ifndef INCLUDE_H_
 #define INCLUDE_H_
 #define MAXP 18
-#define TOTALRSC 3
+#define TOTALRSC 20
 
 //int shmRsc;
 
@@ -27,6 +27,7 @@ void errorCheck (int i, char* string);
 
 
 typedef struct{
+	int waitedOn[TOTALRSC];
 	int totalR[TOTALRSC];
 	int requested[MAXP][TOTALRSC];
 	int available[TOTALRSC];

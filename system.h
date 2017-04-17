@@ -30,14 +30,13 @@ typedef struct{
 	char mtext[MSGSIZE];
 } mymsg_t;
 
-bool timeIsUp(system_t* clock);
+bool timeIsUp(system_t*);
 int initqueue();
 system_t* getSystem();
 void releaseClock(system_t** ptr, char name);
 void initClock(system_t* clock);
 bool updateClock(int increment, system_t* clock);
 bool rollOver(system_t*);
-//void setTimer(int*);
-//void spawn(int[]);
+void setTimer(system_t*);
 
 #endif /* SYSTEM_H_ */

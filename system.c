@@ -11,7 +11,7 @@
 
 void errorCheck (int i, char* string){
         if (i < 0){
-        fprintf(stderr, "%d: ", getpid());
+        fprintf(stderr, "\t\t!!!%d: ", getpid());
         perror(string);// exit(-1);
         }
 }
@@ -27,14 +27,14 @@ system_t* getSystem(){
 		system_t *loc;
         key_t key;
         errorCheck(key = ftok("Makefile", 'R'), "key");
-        errorCheck(shmid = shmget(key, (sizeof(system)),
+        errorCheck(shmid = shmget(key, (sizeof(system_t)),
         		0606 | IPC_CREAT), "shmget sysClock");
         loc = shmat(shmid, (void*)0,0);
         return loc;
 }
 void releaseClock(system_t** ptr, char name){
         if(name == 'd')shmctl(shmid, IPC_RMID, NULL);
-        else errorCheck(shmdt(*ptr), "shmdt");
+        else errorCheck(shmdt(*ptr), "shmdt clock");
         return;
 }
 
@@ -47,13 +47,12 @@ void initClock(system_t* clock){
 }
 
 bool updateClock(int increment, system_t* clock){
-	if (clock->clock[0] > 1) return false;
+	if (clock->clock[0] >= 1) return false;
 
 	msgrcv(msgKey, &message, MSGSIZE, 4, 0);
 
 	clock->clock[1] += increment;
 	rollOver(clock);
-	//printf("%d: incrementing to %02li:%09li\n", getpid(), clock->clock[0], clock->clock[1]);
 	errorCheck(msgsnd(msgKey, &message, MSGSIZE, 0), "clock message");
 	return true;
 }
@@ -70,35 +69,20 @@ bool rollOver(system_t* clock){
 	return true;
 }
 
-/*void spawn(int timer[]){
-	int last = x;
-	if (systemClock[0] > timer[0] ||
-		(systemClock[0] == timer[0] && systemClock[1] > timer[1])){
-		while (true){
-			if (x == MAXP) x = 0;
-			x++;
-			if (x == last) break;
-			if (!status[x]){
-				spawned++;
-				initialFork(x);
-				break;
-			}
-		}
-		setTimer(timer);
-	}
+bool timeIsUp(system_t* clock){
+	if (clock->clock[1] > clock->timer[1] && clock->clock[0] >= clock->timer[0])
+		return true;
+	else if (clock->clock[0] > clock->timer[0])
+		return true;
+	else return false;
+
 }
-*/
-/*void setTimer(int *timer){
-	timer[0] = systemClock[0];
-	timer[1] = rand()%(int)pow(10,8) + systemClock[1];
-	if (timer[1] >=(int)pow(10,9)){
-		timer[0]++;
-		timer[1]-=(int)pow(10,9);
-	}
-	fprintf(fptr, "OSS: %d:%09d New        process will be spawned at     %d%09d\n",
-		systemClock[0], systemClock[1], timer[0] , timer[1]);
-	lineCount++;
+
+void setTimer(system_t* clock){
+	clock->timer[0] = clock->clock[0];
+	clock->timer[1] = rand()%(int)pow(10,8) + clock->clock[1];
+	rollOver(clock);
 }
-*/
+
 
 

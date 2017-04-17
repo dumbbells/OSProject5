@@ -1,13 +1,16 @@
 #include "includes.h"
 
-void initialFork(int);
+void initialFork();
 void masterHandler(int signum);
 bool requestMgmt(mymsg_t*);
 void cleanUp(int);
 void deadLockCheck();
 bool futureAvailable(int, int);
+void deadLockResolve(int);
+int numOfDeadLocksResolved(int);
 
 int x = 2;
+int deadLocks = 0;
 
 struct sigaction act;
 int queueid;
@@ -39,9 +42,7 @@ int main(int argc, char **argv){
 	initRsc(rscid);
 
 	for (i = 0; i < x; i++){
-		if (sysid->children[i] == 0){
-			initialFork(i);
-		}
+		initialFork();
 	}
 
 	while (updateClock(100000, sysid)){
@@ -50,24 +51,41 @@ int main(int argc, char **argv){
 				msgsnd(queueid, &message, MSGSIZE, 0);
 			}
 		}
+		if (timeIsUp(sysid)){
+			initialFork();
+			setTimer(sysid);
+		}
 	}
 	printWaitList(rscid, sysid->children);
 	masterHandler(0);
 }
 
+int numOfDeadLocksResolved(int process){
+	int i, value = 0;
+	for (i = 0; i < TOTALRSC; i++){
+		if (rscid->waitedOn[i] > 0){
+			if (rscid->waitedOn[i] >= rscid->requested[process][i])
+				value += rscid->requested[process][i];
+			else value += rscid->waitedOn[i];
+		}
+	}
+	return value;
+}
+
 void deadLockResolve(int rsc){
-	int i, sysPid = 0;
+	int i, sysPid = 0, numResolved = 0, temp;
+	deadLocks++;
+	printf("\t\t !!!Deadlock detected!!!\n");
 	mymsg_t message;
 	pid_t pidToKill = sysid->children[sysPid];
 	for (i = 0; i < MAXP; i++){
-		if (rscid->waitList[i] == rsc){
-			if (rscid->requested[i][rsc] > rscid->requested[sysPid][rsc]){
-				pidToKill = sysid->children[i];
-				sysPid = i;
-			}
+		if (numResolved <= (temp = numOfDeadLocksResolved(i))){
+			sysPid = i;
+			numResolved = temp;
 		}
 	}
-	printf("The process to terminate to resolve deadlock is %d\n", pidToKill);
+	pidToKill = sysid->children[sysPid];
+	printf("The process to terminate to resolve deadlock is %d for %d resolutions\n", pidToKill, numResolved);
 	cleanUp(sysPid);
 	releaseAll(rscid, sysPid);
 	int deadPid = sysPid;
@@ -171,13 +189,18 @@ bool requestMgmt(mymsg_t* message){
 	return false;
 }
 
-void initialFork(int i){
-	if (i-1 == MAXP) return;
+void initialFork(){
+	int i = 0;	
+	while (sysid->children[i] != 0){
+		if (i-1 == MAXP) return;
+		i++;
+	}
 	pid_t childPid;
 	switch (childPid = fork()){
         	case -1: perror("problem with fork()ing"); break;
         	case 0: execl("userProcess", "./userProcess", NULL); break;
         	default: sysid->children[i] = childPid;
+		printf("\tSpawning a new userProcess %d\n", childPid);
 	}
 }
 
@@ -185,7 +208,7 @@ void cleanUp(int i){
 	if (sysid->children[i] != 0){
 		kill(sysid->children[i], SIGINT);
 		waitpid(sysid->children[i],0,0);
-		//printf("\t\t we caught it!\n");
+		printf("\t\t we caught %d\n", sysid->children[i]);
 		sysid->children[i] = 0;
 	}
 }
@@ -200,6 +223,7 @@ void masterHandler(int sig){
 	releaseCtrl(&rscid, 'd');
 	releaseClock(&sysid, 'd');
 //	fclose(fptr);
+	printf("deadlocks resolved: %d\n", deadLocks);
 	printf("final clock %li:%09li \n", sysid->clock[0], sysid->clock[1]);
 	if (sig != 0) fprintf(stderr, "program was termed\n");
 	else printf("no errors detected\n");
