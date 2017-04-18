@@ -54,14 +54,21 @@ int waitRelief(memCtrl* control, int rscNum, int myPid){
 	return -1;
 }
 
-void printWaitList(memCtrl* control, int* children){
+void printMyRsc(memCtrl* control, int process, FILE* fptr){
+	int i;
+	for (i = 0; i < TOTALRSC; i++){
+		fprintf(fptr, "\t%d: %d\n",i, control->requested[process][i]);
+	}
+}
+
+void printWaitList(memCtrl* control, int* children, FILE* fptr){
 	int i, k;
 	for (i = 0; i < TOTALRSC; i++){
-		printf("%d remaining of rsc %d of %d\n", control->available[i], i, control->totalR[i]);
+//		printf("%d remaining of rsc %d of %d\n", control->available[i], i, control->totalR[i]);
 	}
 	for (i = 0; i < MAXP; i++){
 		if (control->waitList[i] != -1 && children[i] != 0){
-			printf("%d is waiting on %d\n", children[i], control->waitList[i]);
+			fprintf(fptr, "%d is waiting on %d\n", children[i], control->waitList[i]);
 		}
 	}
 /*	for (i = 0; i < MAXP; i++){
@@ -75,7 +82,7 @@ void printWaitList(memCtrl* control, int* children){
 */
 }
 
-void initRsc(memCtrl* control){
+void initRsc(memCtrl* control, FILE* fptr){
 	srand(getpid());
 	int i;
 	for (i = 0; i < TOTALRSC; i++){
@@ -83,7 +90,7 @@ void initRsc(memCtrl* control){
 		control->totalR[i] = rand()%10 + 1;
 		control->available[i] = control->totalR[i];
 		if (rand()%5 == 0) control->totalR[i] = 0;
-		printf("created %d of rsc %d\n", control->totalR[i], i);
+		fprintf(fptr, "created %d of rsc %d\n", control->totalR[i], i);
 	}
 	for (i = 0; i < MAXP; i++){
 		control->waitList[i] = -1;

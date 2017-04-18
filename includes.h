@@ -34,10 +34,11 @@ typedef struct{
 	int waitList[MAXP];
 } memCtrl;
 
+void printMyRsc(memCtrl*, int, FILE*);
 int waitRelief(memCtrl* , int, int);
-void printWaitList(memCtrl*, int*);
+void printWaitList(memCtrl*, int*, FILE*);
 bool requestRsc(memCtrl*, int, int);
-void initRsc(memCtrl*);
+void initRsc(memCtrl*, FILE*);
 memCtrl* getCtrl();
 void releaseCtrl(memCtrl**, char);
 bool releaseRsc(memCtrl*, int, int);

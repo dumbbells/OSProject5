@@ -6,11 +6,12 @@ bool requestMgmt(mymsg_t*);
 void cleanUp(int);
 void deadLockCheck();
 bool futureAvailable(int, int);
-void deadLockResolve(int);
+void deadLockResolve(int, int);
 int numOfDeadLocksResolved(int);
 
 int x = 2;
 int deadLocks = 0;
+bool verbose = false;
 
 struct sigaction act;
 int queueid;
@@ -24,9 +25,9 @@ int lineCount = 0;
 int main(int argc, char **argv){
 	mymsg_t message;
 	int i;
-	//fptr = fopen(fileName, "w");
+	fptr = fopen("a.out", "w");
 
-    act.sa_handler = masterHandler;
+	act.sa_handler = masterHandler;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
 	sigaction(SIGALRM, &act, 0);
@@ -39,7 +40,7 @@ int main(int argc, char **argv){
 	rscid = getCtrl();
 
 	initClock(sysid);
-	initRsc(rscid);
+	initRsc(rscid, fptr);
 
 	for (i = 0; i < x; i++){
 		initialFork();
@@ -56,7 +57,6 @@ int main(int argc, char **argv){
 			setTimer(sysid);
 		}
 	}
-	printWaitList(rscid, sysid->children);
 	masterHandler(0);
 }
 
@@ -69,31 +69,36 @@ int numOfDeadLocksResolved(int process){
 			else value += rscid->waitedOn[i];
 		}
 	}
+	printMyRsc(rscid, process, fptr);
 	return value;
 }
 
-void deadLockResolve(int rsc){
-	int i, sysPid = 0, numResolved = 0, temp;
+void deadLockResolve(int rsc, int process){
+	int i, sysPid = process, numResolved, temp;
 	deadLocks++;
-	printf("\t\t !!!Deadlock detected!!!\n");
+	numResolved = numOfDeadLocksResolved(process);
 	mymsg_t message;
-	pid_t pidToKill = sysid->children[sysPid];
+	pid_t pidToKill;
 	for (i = 0; i < MAXP; i++){
+		if (i == process) continue;
 		if (rscid->waitList[i] != rsc) continue;
 		if (numResolved <= (temp = numOfDeadLocksResolved(i))){
 			sysPid = i;
 			numResolved = temp;
 		}
 	}
+	if (numResolved == 0) numResolved = 1;
 	pidToKill = sysid->children[sysPid];
-	printf("The process to terminate to resolve deadlock is %d for %d resolutions\n", pidToKill, numResolved);
+	printWaitList(rscid, sysid->children, fptr);
+	fprintf(fptr, "The process to terminate to resolve deadlock is %d for %d resolutions\n", pidToKill, numResolved);
 	cleanUp(sysPid);
 	releaseAll(rscid, sysPid);
 	int deadPid = sysPid;
 	for (i = 0; i < TOTALRSC; i++){
 		while ((sysPid = waitRelief(rscid, i, deadPid)) != -1){
-						printf("\t%d: sending %d to %d\n",
-								pidToKill, i, sysid->children[sysPid]);
+						fprintf(fptr,"\t\t%d: forced termination", pidToKill);
+						fprintf(fptr,"\tsending %d to %d\n",
+								i, sysid->children[sysPid]);
 						message.mtype = sysid->children[sysPid];
 						sprintf(message.mtext, "%02d %d", i, sysid->children[sysPid]);
 						msgsnd(queueid, &message, MSGSIZE, 0);
@@ -109,6 +114,8 @@ bool futureAvailable(int rsc, int myPid){
 			if (rscid->waitList[i] == -1) return true;
 		}
 	}
+	fprintf(fptr,"\t\t !!!Deadlock detected!!!\n");
+	fprintf(fptr,"%d is deadlocked waiting for %d\n", sysid->children[myPid], rscid->waitList[myPid]);
 	return false;
 }
 
@@ -117,9 +124,8 @@ void deadLockCheck(){
 	for (i = 0; i < MAXP; i++){
 		if (sysid->children[i] == 0) continue;
 		else if (rscid->waitList[i] > -1){
-			printf("%d is blocked\n", sysid->children[i]);
-			if (futureAvailable(rscid->waitList[i], i)) printf("might come around\n");
-			else deadLockResolve(rscid->waitList[i]);
+			if (verbose) fprintf(fptr,"%d is blocked\n", sysid->children[i]);
+			if (!futureAvailable(rscid->waitList[i], i)) deadLockResolve(rscid->waitList[i], i);
 		}
 	}
 }
@@ -147,23 +153,22 @@ bool requestMgmt(mymsg_t* message){
 		}
 	}
 	if (message->mtype == 3){
-		printf("%d: requesting rsc %d at %li:%09li\n", pid,
+		if (verbose) fprintf(fptr,"%d: requesting rsc %d at %li:%09li\n", pid,
 				rsc, sysid->clock[0], sysid->clock[1]);
 		if (requestRsc(rscid, childId, rsc)){
 			message->mtype = pid;
-			//printf("!! %d: request granted!!\n", pid);
 			return true;
 		}
-		printf("\t\t%d: I am blocked!!!!\n", sysid->children[childId]);
+		if (verbose) fprintf(fptr,"\t\t%d: I am blocked!!!!\n", sysid->children[childId]);
 		deadLockCheck();
 	}
 	else if(message->mtype == 2){
 		if (releaseRsc(rscid, childId, rsc)){
 			sysPid = childId;
-			printf("%d: releasing rsc %d at %li:%09li\n", pid,
+			if (verbose) fprintf(fptr,"%d: releasing rsc %d at %li:%09li\n", pid,
 					rsc, sysid->clock[0], sysid->clock[1]);
 			while ((childId = waitRelief(rscid, rsc, sysPid)) != -1){
-				printf("\t%d: sending %d to %d\n",
+				if (verbose) fprintf(fptr,"\t%d: sending %d to %d\n",
 						pid, rsc, sysid->children[childId]);
 				message->mtype = sysid->children[childId];
 				sprintf(message->mtext, "cont");
@@ -173,13 +178,13 @@ bool requestMgmt(mymsg_t* message){
 		}
 	}
 	else if (message->mtype == 1){
-		printf("\t !! %d: termination noted!!\n", pid);
+		if (verbose) fprintf(fptr,"\t !! %d: termination noted!!\n", pid);
 		cleanUp(childId);
 		releaseAll(rscid, childId);
 		sysPid = childId;
 		for (count = 0; count < TOTALRSC; count++){
 			while ((childId = waitRelief(rscid, count, sysPid)) != -1){
-							printf("\t%d: sending %d to %d\n",
+							if (verbose) printf("\t%d: sending %d to %d\n",
 									pid, count, sysid->children[childId]);
 							message->mtype = sysid->children[childId];
 							msgsnd(queueid, message, MSGSIZE, 0);
@@ -201,7 +206,7 @@ void initialFork(){
         	case -1: perror("problem with fork()ing"); break;
         	case 0: execl("userProcess", "./userProcess", NULL); break;
         	default: sysid->children[i] = childPid;
-		printf("\tSpawning a new userProcess %d\n", childPid);
+		if (verbose) fprintf(fptr,"\tSpawning a new userProcess %d\n", childPid);
 	}
 }
 
@@ -209,7 +214,7 @@ void cleanUp(int i){
 	if (sysid->children[i] != 0){
 		kill(sysid->children[i], SIGINT);
 		waitpid(sysid->children[i],0,0);
-		printf("\t\t we caught %d\n", sysid->children[i]);
+		if (verbose) fprintf(fptr,"\t\t we caught %d\n", sysid->children[i]);
 		sysid->children[i] = 0;
 	}
 }
@@ -223,10 +228,9 @@ void masterHandler(int sig){
 	errorCheck(msgctl(queueid, IPC_RMID,0 ), "closing message queue");
 	releaseCtrl(&rscid, 'd');
 	releaseClock(&sysid, 'd');
-//	fclose(fptr);
-	printf("deadlocks resolved: %d\n", deadLocks);
-	printf("final clock %li:%09li \n", sysid->clock[0], sysid->clock[1]);
+	fclose(fptr);
+	fprintf(fptr,"deadlocks resolved: %d\n", deadLocks);
 	if (sig != 0) fprintf(stderr, "program was termed\n");
-	else printf("no errors detected\n");
+	else if (verbose) printf("no errors detected\n");
 	exit(1);
 }

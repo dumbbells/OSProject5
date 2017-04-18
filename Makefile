@@ -15,4 +15,4 @@ userProcess: child.o rscMgmt.o system.o
 	rm *.o
 
 clean:
-	rm *.o oss userProcess
+	rm -f *.o oss userProcess a.out

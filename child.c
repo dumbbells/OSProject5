@@ -9,8 +9,8 @@ void timeUp();
 struct sigaction act;
 int queueid, quantum = 1000000;
 system_t childData;
-system_t* sysid;
-memCtrl* rscid;
+system_t* sysid = NULL;
+memCtrl* rscid = NULL;
 mymsg_t message;
 
 int main(int argc, char **argv){
@@ -61,7 +61,6 @@ int main(int argc, char **argv){
 		//else printf("skip\n");
 	}
 
-	printf("child pid: %d\n", getpid());
 	exit(1);
 }
 
@@ -105,8 +104,7 @@ void setReqTimer(){
 }
 
 void childHandler(int sig){
-	//fprintf(stderr, "goodbye from child %d\n", getpid());
-	releaseClock(&sysid, ' ');
-	releaseCtrl(&rscid, ' ');
+	if(sysid != NULL) releaseClock(&sysid, ' ');
+	if(rscid != NULL) releaseCtrl(&rscid, ' ');
 	exit(1);
 }
