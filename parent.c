@@ -11,7 +11,7 @@ int numOfDeadLocksResolved(int);
 
 int x = 2;			//starting processes
 int deadLocks = 0;	//counter for deadlocks
-bool verbose = true;
+bool verbose = false;
 
 struct sigaction act;
 int queueid;
@@ -25,6 +25,13 @@ int main(int argc, char **argv){
 	mymsg_t message;
 	int i;
 	fptr = fopen("a.out", "w");
+
+	while ((i = getopt (argc, argv, "v")) != -1){
+	switch (i){
+	case 'v': verbose = true; break;
+	default: fprintf(stderr, "Invalid command line argument\n");
+		exit(-1);
+	}}
 
 	act.sa_handler = masterHandler;
 	act.sa_flags = 0;
