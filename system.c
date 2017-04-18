@@ -9,19 +9,22 @@
 	mymsg_t message;
 	int msgKey;
 
+//checks for bad return types
 void errorCheck (int i, char* string){
         if (i < 0){
         fprintf(stderr, "\t\t!!!%d: ", getpid());
-        perror(string);// exit(-1);
+        perror(string);
         }
 }
 
+//creates message queue or returns id for created msg queue
 int initqueue(){
         errorCheck(msgKey = ftok("Makefile", 'R'), "ftok");
         errorCheck(msgKey=msgget(msgKey, 0666 | IPC_CREAT), "msgget");
         return msgKey;
 }
 
+//system clock structure for tracking time and children
 int shmid;
 system_t* getSystem(){
 		system_t *loc;
@@ -32,12 +35,14 @@ system_t* getSystem(){
         loc = shmat(shmid, (void*)0,0);
         return loc;
 }
+//detaches and/or destroys system clock
 void releaseClock(system_t** ptr, char name){
         if(name == 'd')shmctl(shmid, IPC_RMID, NULL);
-        else errorCheck(shmdt(*ptr), "shmdt clock");
+        else shmdt(*ptr);
         return;
 }
 
+//initializes clock and begins churn by sending a message of type 4
 void initClock(system_t* clock){
 	message.mtype = 4;
 	message.mtext[0] = 'k';
@@ -46,8 +51,10 @@ void initClock(system_t* clock){
 	clock->clock[1] = 0;
 }
 
+//critical section, all processes must receive the one message of
+//type 4 before they can increment the clock.
 bool updateClock(int increment, system_t* clock){
-	if (clock->clock[0] >= 1) return false;
+	if (clock->clock[0] > 1) return false;
 
 	msgrcv(msgKey, &message, MSGSIZE, 4, 0);
 
@@ -57,6 +64,7 @@ bool updateClock(int increment, system_t* clock){
 	return true;
 }
 
+//function to carry the 1 on the clock
 bool rollOver(system_t* clock){
 	if (clock->clock[1] >=(int)pow(10,9)){
 		clock->clock[0]++;
@@ -69,6 +77,7 @@ bool rollOver(system_t* clock){
 	return true;
 }
 
+//checks to see if it's time to spawn a new process or make a request
 bool timeIsUp(system_t* clock){
 	if (clock->clock[1] > clock->timer[1] && clock->clock[0] >= clock->timer[0])
 		return true;
@@ -78,11 +87,9 @@ bool timeIsUp(system_t* clock){
 
 }
 
+//function to set timer for a new process
 void setTimer(system_t* clock){
 	clock->timer[0] = clock->clock[0];
 	clock->timer[1] = rand()%(int)pow(10,8) + clock->clock[1];
 	rollOver(clock);
 }
-
-
-

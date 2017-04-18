@@ -1,6 +1,9 @@
 #include "includes.h"
 int shmid1;
 
+//evaluates if a function is sharable or available. returns true if
+//granted. sharable functions totalR is 0 adds process to waitList
+//and tallies 1 for waitedOn if necessary
 bool requestRsc(memCtrl* control, int process, int rscNum){
 	if (control->totalR[rscNum] == 0)
 		return true;
@@ -15,6 +18,7 @@ bool requestRsc(memCtrl* control, int process, int rscNum){
 	return false;
 }
 
+//releases a single resource and puts it back to available
 bool releaseRsc(memCtrl* control, int process, int rscNum){
 	if (control->totalR[rscNum] == 0) return false;
 	control->requested[process][rscNum]--;
@@ -22,21 +26,22 @@ bool releaseRsc(memCtrl* control, int process, int rscNum){
 	return true;
 }
 
+//releases all resources and keeps track of resources available
+//waitlist of -1 means it is not waiting, 0 -> 19 refers to each rsc
 void releaseAll(memCtrl* control, int process){
 	int i;
-/*	printf("releasing: %d, there are %d currently remaining.\n",
-			control->requested[process][4],
-			control->available[4]);*/
 	for (i = 0; i < TOTALRSC; i++){
 		control->available[i] += control->requested[process][i];
 		control->requested[process][i] = 0;
 		if (control->waitList[process] > -1){
-			control->waitedOn[control->waitList[process]]--;			
-			control->waitList[process] = -1;		
+			control->waitedOn[control->waitList[process]]--;
+			control->waitList[process] = -1;
 		}
 	}
 }
 
+//checks if there is a process waiting for a recently released resource
+//and returns the pid value for oss to send a message
 int waitRelief(memCtrl* control, int rscNum, int myPid){
 	int i;
 	for (i = 0; i < MAXP; i++){
@@ -54,6 +59,7 @@ int waitRelief(memCtrl* control, int rscNum, int myPid){
 	return -1;
 }
 
+//prints resources held. Useful for following deadlock resolutions
 void printMyRsc(memCtrl* control, int process, FILE* fptr){
 	int i;
 	for (i = 0; i < TOTALRSC; i++){
@@ -61,27 +67,17 @@ void printMyRsc(memCtrl* control, int process, FILE* fptr){
 	}
 }
 
+//prints processes that are currently waiting and what they're waiting on
 void printWaitList(memCtrl* control, int* children, FILE* fptr){
 	int i, k;
-	for (i = 0; i < TOTALRSC; i++){
-//		printf("%d remaining of rsc %d of %d\n", control->available[i], i, control->totalR[i]);
-	}
 	for (i = 0; i < MAXP; i++){
 		if (control->waitList[i] != -1 && children[i] != 0){
 			fprintf(fptr, "%d is waiting on %d\n", children[i], control->waitList[i]);
 		}
 	}
-/*	for (i = 0; i < MAXP; i++){
-		if (children[i] != 0){
-			printf("%d attained:\n", children[i]);
-			for (k = 0; k < TOTALRSC; k++){
-				printf("RSC %d: %d\n", k, control->requested[i][k]);
-			}
-		}
-	}
-*/
 }
 
+//initializes the resources available. 0 is unlimited
 void initRsc(memCtrl* control, FILE* fptr){
 	srand(getpid());
 	int i;
@@ -97,6 +93,7 @@ void initRsc(memCtrl* control, FILE* fptr){
 	}
 }
 
+//attaches processes to shared mem
 memCtrl* getCtrl(){
 		memCtrl *loc;
         key_t key;
@@ -107,9 +104,9 @@ memCtrl* getCtrl(){
         return loc;
 }
 
-
+//releases processes from shared mem
 void releaseCtrl(memCtrl** ptr, char name){
         if(name == 'd') shmctl(shmid1, IPC_RMID, NULL);
-        else errorCheck(shmdt(*ptr), "shmdt");
+        else shmdt(*ptr);
         return;
 }

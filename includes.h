@@ -24,14 +24,12 @@
 
 void errorCheck (int i, char* string);
 
-
-
 typedef struct{
-	int waitedOn[TOTALRSC];
-	int totalR[TOTALRSC];
-	int requested[MAXP][TOTALRSC];
-	int available[TOTALRSC];
-	int waitList[MAXP];
+	int waitedOn[TOTALRSC];	//array keeping track of which resources are in demand
+	int totalR[TOTALRSC];		//total RSC (0 is sharable)
+	int requested[MAXP][TOTALRSC];	//how many of each resource each child posesses
+	int available[TOTALRSC];	//how many copies of each resource are abailable
+	int waitList[MAXP];		//which process is on the wait list for which resource
 } memCtrl;
 
 void printMyRsc(memCtrl*, int, FILE*);

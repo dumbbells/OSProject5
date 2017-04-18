@@ -1,0 +1,15 @@
+Mark,
+
+To compile type make
+
+To run type ./oss
+
+To get the verbose option, type -v after ./oss
+
+There have been some unexpected shared memory detachment errors. I'm not sure if this bug is persistent in the current build.
+
+Sometimes the deadlock count is a little low. Sometimes it is as many as 20.
+
+My policy for the dead locks is to kill the process in the deadlock with the most resources being waited on.
+
+Greg

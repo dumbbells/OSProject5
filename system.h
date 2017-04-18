@@ -19,12 +19,15 @@
 #include <stdbool.h>
 #include <math.h>
 
+//used to track child timers as well as system clock
+//children is an array of live child pids
 typedef struct{
 	unsigned long clock[2];
 	unsigned long timer[2];
 	pid_t children[MAXP];
 } system_t;
 
+//declaration of message struct
 typedef struct{
 	long mtype;
 	char mtext[MSGSIZE];
